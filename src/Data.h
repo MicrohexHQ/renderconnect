@@ -32,6 +32,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define RMAN_CONNECT_DATA_H_
 
 #include <vector>
+#include <boost/shared_array.hpp>
 
 //! \namespace rmanconnect
 namespace rmanconnect
@@ -54,20 +55,25 @@ namespace rmanconnect
     friend class Server;
     public:
         //! Constructor
-        Data( int x=0, int y=0,
-              int width=0, int height=0,
-              int spp=0, const float *data=0 );
+        Data( int x, int y,
+              int width, int height,
+              int spp, std::string name,
+              boost::shared_array<float> data );
+        Data();
         //! Destructor
         ~Data();
-        
+
         /*! \brief The 'type' of message this Data represents
          *
          * 0: image open
          * 1: pixels
          * 2: image close
+         * 3: update
          */
         const int type() const { return mType; }
+        void setType( int type ) { mType = type; }
 
+        void setDimension(unsigned int width, unsigned int height ) { mWidth=width; mHeight=height; }
         //! X position
         int x() const { return mX; }
         //! y position
@@ -79,22 +85,41 @@ namespace rmanconnect
         //! Samples-per-pixel, aka channel depth
         int spp() const { return mSpp; }
         //! Pointer to pixel data owned by the display driver (client-side)
-        const float *data() const { return mpData; }
+        boost::shared_array<float> data() const { return mpData; }
         //! Pointer to pixel data owned by this object (server-side)
         const float *pixels() const { return &mPixelStore[0]; }
+
+        std::string& getName() { return mName; }
+
+        Data& Data::operator=(const Data &input) {
+            this->mX = input.mX;
+            this->mY = input.mY;
+            this->mType = input.mType;
+            this->mWidth = input.mWidth;
+            this->mName = input.mName;
+            this->mHeight =input.mHeight;
+            this->mSpp=input.mSpp;
+            this->mpData=input.mpData;
+            this->mPixelStore = input.mPixelStore;
+
+            return *this;  // Return a reference to myself.
+        }
 
     private:
         // what type of data is this?
         int mType;
 
         // x & y position
-        int mX, mY; 
-        
+        int mX, mY;
+
+        // name of the channel
+        std::string mName;
+
         // width, height, num channels (samples)
         unsigned int mWidth, mHeight, mSpp;
 
         // our pixel data pointer (for driver-owned pixels)
-        float *mpData; 
+        boost::shared_array<float> mpData;
 
         // our persistent pixel storage (for Data-owned pixels)
         std::vector<float> mPixelStore;

@@ -34,20 +34,35 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 using namespace rmanconnect;
 
-Data::Data( int x, int y, 
-            int width, int height, 
-            int spp, const float *data ) :
+Data::Data( int x, int y,
+            int width, int height,
+         int spp, std::string name,
+         boost::shared_array<float> data ) :
     mType(-1),
     mX(x),
     mY(y),
     mWidth(width),
     mHeight(height),
-    mSpp(spp)
+    mSpp(spp),
+    mName(name)
 {
-    if ( data!=0 )
-        mpData = const_cast<float*>(data);
+    mpData=data;
+}
+
+Data::Data() :
+   mType(-1),
+    mX(0),
+    mY(0),
+    mWidth(0),
+    mHeight(0),
+    mSpp(0),
+    mName(std::string("rgba")),
+    mpData( new float[0] )
+{
 }
 
 Data::~Data()
 {
+   //if( ! mPixelStore.empty() )
+   //	mPixelStore.clear();
 }

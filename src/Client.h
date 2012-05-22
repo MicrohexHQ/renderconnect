@@ -33,7 +33,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "Data.h"
 #include <boost/asio.hpp>
+#include <boost/shared_ptr.hpp>
+#include <boost/thread.hpp>
 #include <string>
+#include <queue>
 
 //! \namespace rmanconnect
 namespace rmanconnect
@@ -57,6 +60,8 @@ namespace rmanconnect
          */
         Client( std::string hostname, int port );
 
+        Client( );
+
         //! Destructor
         ~Client();
 
@@ -65,8 +70,8 @@ namespace rmanconnect
          * The header parameter is used to tell the Server the size of image
          * buffer to allocate.
          */
-        void openImage( Data &header );
-        
+        bool openImage( Data &header );
+
         /*! \brief Sends a section of image data to the Server.
          *
          * Once an image is open a Client can use this to send a series of
@@ -74,24 +79,42 @@ namespace rmanconnect
          * specify the block position and dimensions as well as provide a
          * pointer to pixel data.
          */
-        void sendPixels( Data &data );
+        bool sendPixels( boost::shared_ptr<Data> data );
+
+
+        bool triggerUpdate( );
+
+        bool queueEmpty(){
+            boost::lock_guard< boost::mutex> lock(mutex);
+            return mPacketQueue.empty();
+        }
+        void runQueue();
+
+        void newPacket(boost::shared_ptr<Data> data);
 
         /*! \brief Sends a message to the Server that the Clients has finished
          *
          * This tells the Server that a Client has finished sending pixel
          * information for an image.
          */
-        void closeImage();
-        
+        bool closeImage();
+
+        bool isvalid(){ return mValid; }
+
     private:
         void connect( std::string host, int port );
         void disconnect();
-        void quit();
+        bool quit();
+
+        bool mValid;
 
         // store the port we should connect to
         std::string mHost;
         int mPort, mImageId;
         bool mIsConnected;
+
+        boost::mutex mutex;
+        std::queue< boost::shared_ptr<Data> > mPacketQueue;
 
         // tcp stuff
         boost::asio::io_service mIoService;

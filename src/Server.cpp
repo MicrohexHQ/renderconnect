@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "Server.h"
 #include "Client.h"
 #include <boost/lexical_cast.hpp>
+#include <boost/scoped_array.hpp>
 #include <vector>
 #include <iostream>
 #include <stdexcept>
@@ -92,9 +93,9 @@ void Server::connect( int port, bool search )
     if ( !mAcceptor.is_open() )
     {
         char buffer[32];
-        sprintf(buffer, "port: %d", start_port);
+        sprintf_s( buffer, sizeof(buffer), "port: %d", start_port);
         if (search)
-            sprintf(buffer, "port: %d-%d", start_port, start_port + 99);
+            sprintf_s(buffer, sizeof(buffer),"port: %d-%d", start_port, start_port + 99);
         std::string error = "Failed to connect to port ";
         error += buffer;
         throw std::runtime_error( error.c_str() );
@@ -150,17 +151,25 @@ Data Server::listen()
 
                 // receive image id
                 int image_id;
-                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&image_id), sizeof(int)) );
+                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&image_id),  sizeof(int) ));
 
                 // get data info
-                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&d.mX), sizeof(int)) );
-                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&d.mY), sizeof(int)) );
-                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&d.mWidth), sizeof(int)) );
-                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&d.mHeight), sizeof(int)) );
-                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&d.mSpp), sizeof(int)) );
+                size_t nameLen = 0;
+                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&nameLen),   sizeof(size_t) ));
+                boost::scoped_array<char> chan_name(new char[nameLen+1]);
+                boost::asio::read( mSocket, boost::asio::buffer( chan_name.get(),    nameLen ));
+                chan_name[nameLen] = '\0';
+                d.mName = std::string(chan_name.get());
+
+                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&d.mX),      sizeof(int) ));
+                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&d.mY),      sizeof(int) ));
+                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&d.mWidth),  sizeof(int) ));
+                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&d.mHeight), sizeof(int) ));
+                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&d.mSpp),    sizeof(int) ));
 
                 // get pixels
-                int num_samples = d.width() * d.height() * d.spp();
+                int bufferType = ( d.spp() == 2 ) ? 3: d.spp();
+                int num_samples = d.width() * d.height() * bufferType;
                 d.mPixelStore.resize( num_samples );
                 boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&d.mPixelStore[0]), sizeof(float)*num_samples ) ) ;
                 break;
@@ -171,6 +180,14 @@ Data Server::listen()
                 d.mType = key;
                 boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&image_id), sizeof(int)) );
                 mSocket.close();
+                break;
+            }
+            case 3: // update image
+            {
+                int image_id;
+                d.mType = key;
+                boost::asio::read( mSocket, boost::asio::buffer(reinterpret_cast<char*>(&image_id), sizeof(int)) );
+
                 break;
             }
             case 9: // quit
